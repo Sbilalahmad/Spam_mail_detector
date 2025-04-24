@@ -1,6 +1,7 @@
 import tkinter as tk
 # Remove messagebox, keep scrolledtext and ttk
 from tkinter import scrolledtext, ttk
+from tkinter import filedialog # Add filedialog for opening files
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
@@ -8,6 +9,9 @@ from sklearn.pipeline import make_pipeline
 # Remove train_test_split
 # from sklearn.model_selection import train_test_split
 import sv_ttk # Import the theme library
+import email # Add email library for parsing .eml files
+from email import policy # Import policy for modern parsing
+import traceback # For error handling
 
 # --- Tooltip Class ---
 class Tooltip:
@@ -101,6 +105,40 @@ def check_spam():
              result_label.config(text=result, foreground="grey") # Fallback
 
 
+def load_and_check_eml():
+    """Opens a .eml file, extracts body, puts it in text input, and checks."""
+    filepath = filedialog.askopenfilename(
+        title="Open Email File",
+        filetypes=[("Email files", "*.eml"), ("All files", "*.*")]
+    )
+    if not filepath:
+        return # User cancelled
+
+    try:
+        with open(filepath, 'rb') as f: # Read as bytes
+            msg = email.message_from_bytes(f.read(), policy=policy.default)
+
+        # Extract subject for context (optional)
+        subject = msg.get('subject', '[No Subject]')
+        print(f"Loaded email with subject: {subject}") # Log to console
+
+        # Extract body
+        body = get_email_body(msg)
+
+        # Clear previous text and insert new body
+        text_input.delete("1.0", tk.END)
+        text_input.insert("1.0", body)
+
+        # Automatically run the check
+        check_spam()
+
+    except Exception as e:
+        result_label.config(text=f"Error loading/parsing file: {e}", foreground="orange")
+        print("--- Error loading .eml file ---")
+        traceback.print_exc()
+        print("-------------------------------")
+
+
 # Main window
 root = tk.Tk()
 root.title("Spam Detector")
@@ -146,14 +184,24 @@ text_input = scrolledtext.ScrolledText(text_frame, wrap=tk.WORD, width=60, heigh
                                        bg="#E3F2FD", # Light blue background
                                        fg="#0D47A1") # Dark blue text
 text_input.pack(pady=0, padx=0, fill=tk.BOTH, expand=True)
-Tooltip(text_input, "Paste the full text of the email here to check if it's spam or ham.")
+Tooltip(text_input, "Paste email text here, or load from a .eml file using the button below.")
 
 
-# Check Button
+# --- Buttons Frame ---
+# Create a frame to hold the buttons side-by-side
+buttons_frame = ttk.Frame(main_frame)
+buttons_frame.pack(pady=20)
+
+# Load EML Button
+load_button = ttk.Button(buttons_frame, text="Load & Check .eml File", command=load_and_check_eml, width=25)
+load_button.pack(side=tk.LEFT, padx=5) # Pack side-by-side
+Tooltip(load_button, "Click to load an email from a .eml file and check it for spam.")
+
+# Check Button (Manual Input)
 # Apply the custom style 'Colored.TButton'
-check_button = ttk.Button(main_frame, text="Check for Spam", command=check_spam, width=20, style='Colored.TButton')
-check_button.pack(pady=20) # Increased vertical padding
-Tooltip(check_button, "Click to analyze the text and predict if it's spam.")
+check_button = ttk.Button(buttons_frame, text="Check Pasted Text", command=check_spam, width=20, style='Colored.TButton')
+check_button.pack(side=tk.LEFT, padx=5) # Pack side-by-side
+Tooltip(check_button, "Click to analyze the text currently pasted in the box above.")
 
 
 # Result Label
